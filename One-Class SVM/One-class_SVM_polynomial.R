@@ -1,0 +1,64 @@
+library(e1071);
+library(caret);
+
+# SVM CV function
+svmCV = function(train, val, degreein, gammain, nuin) {
+  # build model
+  kernal = "polynomial";
+  degree = degreein;
+  gamma = gammain;
+  nu = nuin;
+  trainminor = train[!(train$Severity=="Slight"),];
+  svmorig = svm(Severity~., data = trainminor, type = "one-classification", kernal = kernal, degree = degree, gamma = gamma, nu = nu);
+  svmpre = predict(svmorig, newdata = val);
+  svmpreresult = as.data.frame(svmpre);
+  svmpreresult[svmpreresult==TRUE] = "Non-Slight";
+  svmpreresult[svmpreresult==FALSE] = "Slight";
+  svmpreresult = lapply(svmpreresult, as.factor);
+  svmpreresult = svmpreresult[[1]];
+  svmtruth = val$Severity;
+  
+  # calculate recall, precision, f-measure
+  recallpos = recall(data = svmpreresult, reference = svmtruth, relevant = "Non-Slight");
+  recallneg = recall(data = svmpreresult, reference = svmtruth, relevant = "Slight");
+  precisionpos = precision(data = svmpreresult, reference = svmtruth, relevant = "Non-Slight");
+  precisionneg = precision(data = svmpreresult, reference = svmtruth, relevant = "Slight");
+  fmeaspos = F_meas(data = svmpreresult, reference = svmtruth, relevant = "Non-Slight");
+  
+  #return results
+  results = c(recallpos,recallneg,precisionpos,precisionneg,fmeaspos);
+  return(t(as.data.frame(results)));
+}
+
+# calculate CV function
+CalculateCV = function(train1,train2,train3,train4,train5,val1,val2,val3,val4,val5,degreein,gammain,nuin) {
+  train = train1;
+  val = val1;
+  CV1 = svmCV(train, val, degreein, gammain, nuin);
+  train = train2;
+  val = val2;
+  CV2 = svmCV(train, val, degreein, gammain, nuin);
+  train = train3;
+  val = val3;
+  CV3 = svmCV(train, val, degreein, gammain, nuin);
+  train = train4;
+  val = val4;
+  CV4 = svmCV(train, val, degreein, gammain, nuin);
+  train = train5;
+  val = val5;
+  CV5 = svmCV(train, val, degreein, gammain, nuin);
+  
+  CVall = ((CV1+CV2+CV3+CV4)*3544 + CV5*3545) / 17721;
+  return(CVall);
+}
+
+allresults = data.frame();
+for (degree in c(2,2.5,3,3.5,4)) {
+  for (gamma in c(0.000005,0.00001,0.000015)) {
+    for (nu in c(0.02,0.04,0.06,0.08)) {
+      svmresults = CalculateCV(set2345,set1345,set1245,set1235,set1234,set1,set2,set3,set4,set5,degree,gamma,nu);
+      svmresults = cbind(degree,gamma,nu,svmresults);
+      allresults = rbind(allresults,svmresults);
+    }
+  }
+}
